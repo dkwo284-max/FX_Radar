@@ -1,0 +1,5 @@
+{
+  "_doc": "목표 환율(원). 값을 넣으면 그 선을 넘는 날 알림과 허브 경고에 표시됩니다. null 이면 끔. send_amount 는 송금 비교 견적 금액(NZD).",
+  "alerts": { "nzd_krw_at_or_above": null, "nzd_krw_at_or_below": null },
+  "send_amount": 1000
+}

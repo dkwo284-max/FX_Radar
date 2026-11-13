@@ -1,0 +1,60 @@
+name: FX update
+
+# 매일 ECB 기준환율(frankfurter)로 NZD/KRW 추이·송금 타이밍 데이터(web/data/fx.json)를 만들고 GitHub Pages 로 배포합니다. AI 0회.
+# ECB 고시는 유럽 오후(UTC 14~16시) → UTC 16:37 에 돌리고(NZ 새벽 4~5시), 늦게 고시될 때를 대비해 UTC 20:07 에 한 번 더.
+on:
+  schedule:
+    - cron: "37 16 * * 1-5"
+    - cron: "7 20 * * 1-5"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [web/**, config.json, scripts/**]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: fx
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pytest && python -m pytest -q tests
+      - name: Build fx.json
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/fx.py
+      - name: Commit data
+        run: |
+          git config user.name "fx-radar-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/data/fx.json
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "fx: $(date -u +%F)"
+          for i in 1 2 3; do git pull --rebase -X theirs -q origin main && git push -q origin HEAD:main && exit 0; git rebase --abort 2>/dev/null; sleep 5; done
+          echo "::error::data commit could not be pushed"; exit 1
+
+  deploy:
+    needs: update
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: web }
+      - id: pages
+        uses: actions/deploy-pages@v4
