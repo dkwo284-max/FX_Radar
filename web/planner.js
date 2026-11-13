@@ -101,7 +101,7 @@
     box.innerHTML = `
       <h2>큰돈 송금 플래너 <span class="hint">한국 → 뉴질랜드</span></h2>
       <div class="calc">
-        <label for="p-amt">보낼 금액 (원)<input id="p-amt" type="number" min="0" step="10000000" value="${st.amount}" inputmode="numeric"></label>
+        <label for="p-amt">보낼 금액 (원)<input id="p-amt" type="text" value="${NumFmt.fmt(st.amount)}" inputmode="numeric" autocomplete="off"><small class="hint" id="p-amt-ko">${NumFmt.ko(st.amount)}</small></label>
         <label for="p-pur">송금 목적<select id="p-pur">${Object.entries(PURPOSE).map(([k, v]) => `<option value="${k}"${k === st.purpose ? ' selected' : ''}>${esc(v.l)}</option>`).join('')}</select></label>
         <label for="p-spl">나눠 보낼 횟수<input id="p-spl" type="number" min="1" max="24" step="1" value="${st.splits}"></label>
         <label for="p-mon">기간 (개월)<input id="p-mon" type="number" min="1" max="24" step="1" value="${st.months}"></label>
@@ -125,7 +125,7 @@
           ${ROUTES.map((r) => { const c = C(r); return `<tr><td>${esc(r.l)}</td>
             <td><input data-c="${r.id}:spread" type="number" step="0.05" min="0" max="5" value="${c.spread}"></td>
             <td>${r.cost.spread2 != null ? `<input data-c="${r.id}:spread2" type="number" step="0.05" min="0" max="5" value="${c.spread2}">` : '—'}</td>
-            <td><input data-c="${r.id}:feeKRW" type="number" step="1000" min="0" value="${c.feeKRW}"></td>
+            <td><input data-c="${r.id}:feeKRW" type="text" inputmode="numeric" autocomplete="off" value="${NumFmt.fmt(c.feeKRW)}"></td>
             <td><input data-c="${r.id}:feeNZD" type="number" step="5" min="0" value="${c.feeNZD}"></td></tr>`; }).join('')}
         </tbody></table></div>
         <button type="button" id="p-reset">가정 되돌리기</button>
@@ -152,14 +152,17 @@
       </ul>
       <p class="hint">이 화면은 공식 안내와 은행 자료를 요약한 참고용 계획 도구이며 법률·세무 자문이 아닙니다. 실제 송금 전 지정 은행과 세무 전문가에게 확인하세요.</p>`;
 
-    const num = (id, f) => $(id).addEventListener('change', (e) => { f(+e.target.value || 0); save(); render(D); });
+    const num = (id, f) => $(id).addEventListener('change', (e) => { f(NumFmt.parse(e.target.value)); save(); render(D); });
+    NumFmt.attach($('#p-amt'));
+    $('#p-amt').addEventListener('input', (e) => { $('#p-amt-ko').textContent = NumFmt.ko(NumFmt.parse(e.target.value)); });
+    box.querySelectorAll('[data-c$=":feeKRW"]').forEach((el) => NumFmt.attach(el));
     num('#p-amt', (v) => { st.amount = Math.max(0, v); });
     num('#p-spl', (v) => { st.splits = Math.max(1, Math.min(24, Math.round(v))); });
     num('#p-mon', (v) => { st.months = Math.max(1, Math.min(24, Math.round(v))); });
     $('#p-pur').addEventListener('change', (e) => { st.purpose = e.target.value; save(); render(D); });
     box.querySelectorAll('[data-c]').forEach((el) => el.addEventListener('change', () => {
       const [id, k] = el.dataset.c.split(':');
-      st.cost[id] = { ...(st.cost[id] || {}), [k]: Math.max(0, +el.value || 0) };
+      st.cost[id] = { ...(st.cost[id] || {}), [k]: Math.max(0, NumFmt.parse(el.value)) };
       save(); render(D); const d = $('#planner .pdet'); if (d) d.open = true;
     }));
     box.querySelectorAll('[data-chk]').forEach((el) => el.addEventListener('change', () => {

@@ -112,8 +112,8 @@ a{color:var(--accent)}
     <h2>송금 계산기</h2>
     <div class="calc">
       <label for="c-dir">방향<select id="c-dir"><option value="nz2kr">NZD → KRW</option><option value="kr2nz">KRW → NZD</option></select></label>
-      <label for="c-amt">보낼 금액<input id="c-amt" type="number" min="0" step="10" value="1000" inputmode="decimal"></label>
-      <label for="c-fee">고정 수수료 (보내는 통화)<input id="c-fee" type="number" min="0" step="0.5" value="0" inputmode="decimal"></label>
+      <label for="c-amt">보낼 금액<input id="c-amt" type="text" value="1,000" inputmode="decimal" autocomplete="off" data-num><small class="hint" id="c-amt-ko"></small></label>
+      <label for="c-fee">고정 수수료 (보내는 통화)<input id="c-fee" type="text" value="0" inputmode="decimal" autocomplete="off" data-num></label>
       <label for="c-mar">환율 마진 % (은행·업체 스프레드)<input id="c-mar" type="number" min="0" max="10" step="0.1" value="0" inputmode="decimal"></label>
     </div>
     <div><span class="hint">받는 금액 (추정)</span><div class="out" id="c-out">—</div><p class="hint" id="c-note"></p></div>
@@ -137,6 +137,18 @@ a{color:var(--accent)}
   <footer class="hint" id="foot">ECB 기준환율은 유럽 시간 오후에 하루 한 번 고시되며 주말·휴일에는 바뀌지 않습니다. 실제 송금 환율과 다르므로 참고용으로 보세요.</footer>
 </div>
 <script>
+// 숫자 입력칸에 천 단위 쉼표(1,000,000) 표시: 입력하는 동안 쉼표를 다시 넣고, 계산할 때는 쉼표를 뺀 값을 씁니다
+window.NumFmt=(function(){
+  const parse=(v)=>{const n=parseFloat(String(v??'').replace(/[^\d.]/g,''));return Number.isFinite(n)?n:0};
+  const fmt=(v)=>{const s=String(v??'').replace(/[^\d.]/g,'');if(!s)return '';const [i,...d]=s.split('.');const int=(i.replace(/^0+(?=\d)/,'')||'0').replace(/\B(?=(\d{3})+(?!\d))/g,',');return d.length?`${int}.${d.join('').slice(0,2)}`:int};
+  const ko=(n)=>{n=Math.round(n);if(n<10000)return '';const eok=Math.floor(n/1e8),man=Math.floor(n%1e8/1e4);return `${eok?eok.toLocaleString('ko-KR')+'억 ':''}${man?man.toLocaleString('ko-KR')+'만 ':''}원`.trim()};
+  function attach(el){
+    el.addEventListener('input',()=>{const pos=el.selectionStart??el.value.length;const digitsBefore=el.value.slice(0,pos).replace(/[^\d.]/g,'').length;
+      el.value=fmt(el.value);let i=0,seen=0;while(i<el.value.length&&seen<digitsBefore){if(/[\d.]/.test(el.value[i]))seen++;i++}
+      try{el.setSelectionRange(i,i)}catch(e){}});
+  }
+  return {parse,fmt,ko,attach};
+})();
 (function(){
 'use strict';
 const $=(s)=>document.querySelector(s);
@@ -172,8 +184,9 @@ function chart(){
 }
 function calc(){
   if(!D)return;
-  const r=D.pairs.KRW.last, dir=$('#c-dir').value, amt=+$('#c-amt').value||0, fee=+$('#c-fee').value||0, mar=(+$('#c-mar').value||0)/100;
+  const r=D.pairs.KRW.last, dir=$('#c-dir').value, amt=NumFmt.parse($('#c-amt').value), fee=NumFmt.parse($('#c-fee').value), mar=(+$('#c-mar').value||0)/100;
   const base=Math.max(0,amt-fee);
+  $('#c-amt-ko').textContent=dir==='kr2nz'?NumFmt.ko(amt):'';
   if(dir==='nz2kr'){const v=base*r*(1-mar);$('#c-out').textContent=`${Math.round(v).toLocaleString('ko-KR')}원`;$('#c-note').textContent=`적용 환율 ${f2(r*(1-mar))}원 (기준 ${f2(r)}원)`}
   else{const v=base/(r*(1+mar));$('#c-out').textContent=`NZ$${v.toLocaleString('en-NZ',{maximumFractionDigits:2})}`;$('#c-note').textContent=`적용 환율 ${f2(r*(1+mar))}원/NZ$ (기준 ${f2(r)}원)`}
 }
@@ -199,6 +212,7 @@ function render(){
   $('#alerts').innerHTML=al.length?`<ul>${al.map((a)=>`<li><span class="num">${esc(a.date)}</span> ${esc(a.text)}</li>`).join('')}</ul>`:'<p class="hint">최근 60일 알림 없음</p>';
 }
 document.addEventListener('click',(e)=>{const b=e.target.closest('[data-r]');if(!b||!D)return;range=+b.dataset.r;try{localStorage.setItem('fx.range',range)}catch(err){};$('#range').querySelectorAll('button').forEach((x)=>x.setAttribute('aria-pressed',String(+x.dataset.r===range)));chart()});
+document.querySelectorAll('[data-num]').forEach((el)=>NumFmt.attach(el));
 ['#c-dir','#c-amt','#c-fee','#c-mar'].forEach((s)=>$(s).addEventListener('input',calc));
 fetch('data/fx.json',{cache:'no-store'}).then((r)=>r.ok?r.json():Promise.reject(r.status)).then((d)=>{D=d;render();window.__FX=d;window.dispatchEvent(new CustomEvent('fx:data',{detail:d}))})
   .catch(()=>{$('#asof').textContent='';document.querySelector('.wrap').insertAdjacentHTML('afterbegin','<div class="err">환율 데이터를 아직 만들지 못했습니다. 첫 자동 갱신 뒤에 다시 열어 주세요.</div>')});
