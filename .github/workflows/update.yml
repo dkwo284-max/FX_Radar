@@ -41,7 +41,7 @@ jobs:
           git add web/data/fx.json
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git commit -m "fx: $(date -u +%F)"
-          for i in 1 2 3; do git pull --rebase -X theirs -q origin main && git push -q origin HEAD:main && exit 0; git rebase --abort 2>/dev/null; sleep 5; done
+          for i in 1 2 3; do git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0; git rebase --abort 2>/dev/null; sleep 5; done
           echo "::error::data commit could not be pushed"; exit 1
 
   deploy:
