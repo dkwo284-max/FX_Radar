@@ -34,11 +34,15 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python scripts/fx.py
+      - name: Build kr-quotes.json (한국 주식 종가·환율 → 배당 대시보드용, 실패해도 환율 갱신은 계속)
+        continue-on-error: true
+        run: python scripts/kr_quotes.py
       - name: Commit data
         run: |
           git config user.name "fx-radar-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add web/data/fx.json
+          [ -f web/data/kr-quotes.json ] && git add web/data/kr-quotes.json
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git commit -m "fx: $(date -u +%F)"
           for i in 1 2 3; do git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0; git rebase --abort 2>/dev/null; sleep 5; done
