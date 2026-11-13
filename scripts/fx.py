@@ -96,7 +96,7 @@ def signal(k: dict) -> dict:
     to_nz = {"아주 유리": "아주 불리", "유리": "불리", "보통": "보통", "불리": "유리", "아주 불리": "아주 유리"}[to_kr]
     trend = "오르는 중" if k["last"] > k["ma30"] > k["ma90"] else "내리는 중" if k["last"] < k["ma30"] < k["ma90"] else "횡보"
     return {"to_kr": to_kr, "to_nz": to_nz, "trend": trend,
-            "text": f"1년 중 상위 {100 - p:.0f}% 수준 · 30일 평균 대비 {(k['last'] / k['ma30'] - 1) * 100:+.1f}% · {trend}"}
+            "text": f"1년 중 {f'상위 {max(1, round(100 - p))}%' if p >= 50 else f'하위 {max(1, round(p))}%'}수준 · 30일 평균 대비 {(k['last'] / k['ma30'] - 1) * 100:+.1f}% · {trend}"}
 
 
 def alerts(k: dict, prev: dict | None, cfg: dict) -> list[str]:
