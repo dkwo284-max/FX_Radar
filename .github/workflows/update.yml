@@ -1,11 +1,11 @@
 name: FX update
 
 # 매일 ECB 기준환율(frankfurter)로 NZD/KRW 추이·송금 타이밍 데이터(web/data/fx.json)를 만들고 GitHub Pages 로 배포합니다. AI 0회.
-# ECB 고시는 유럽 오후(UTC 14~16시) → UTC 16:37 에 돌리고(NZ 새벽 4~5시), 늦게 고시될 때를 대비해 UTC 20:07 에 한 번 더.
+# 주말에는 고시가 없어 값은 그대로지만 갱신 시각은 매일 남깁니다(허브의 '오늘 갱신' 표시용). ECB 고시는 유럽 오후(UTC 14~16시) → UTC 16:37 에 돌리고(NZ 새벽 4~5시), 늦게 고시될 때를 대비해 UTC 20:07 에 한 번 더.
 on:
   schedule:
-    - cron: "37 16 * * 1-5"
-    - cron: "7 20 * * 1-5"
+    - cron: "37 16 * * *"
+    - cron: "7 20 * * *"
   workflow_dispatch:
   push:
     branches: [main]
