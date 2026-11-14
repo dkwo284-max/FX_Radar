@@ -39,6 +39,19 @@ h1{margin:0;font-size:20px} h2{margin:0;font-size:16px} p{margin:0}
 .sigs{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
 .sig{border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px;background:var(--mid-bg)}
 .sig b{font-size:18px}
+.fch{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}
+.fch b{font-size:22px} .fch b.u{color:var(--good)} .fch b.d{color:var(--bad)}
+.fcf{display:grid;gap:10px}
+.fcg{font-size:12px;color:var(--muted);font-weight:600;margin-top:4px}
+.fcr{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:4px 12px;align-items:center}
+.fcr .nm{font-weight:600;font-size:13.5px} .fcr .why{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
+.fcb{position:relative;height:10px;border-radius:5px;background:var(--mid-bg)}
+.fcb::after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--muted);opacity:.6}
+.fcb i{position:absolute;top:0;bottom:0;border-radius:5px}
+.fcb i.u{left:50%;background:var(--good)} .fcb i.d{right:50%;background:var(--bad)}
+.fcn{border-left:3px solid var(--accent);padding:8px 12px;background:var(--mid-bg);border-radius:0 10px 10px 0;font-size:13.5px}
+.fcn .eb{font-size:12px;color:var(--muted);margin-bottom:4px} .fcn ul{margin:6px 0 0;padding-left:18px}
+@media (max-width:480px){.fcr{grid-template-columns:minmax(0,1fr) 84px}}
 .sig.g{background:var(--good-bg)} .sig.g b{color:var(--good)}
 .sig.r{background:var(--bad-bg)} .sig.r b{color:var(--bad)}
 .gauge{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--bad-bg),var(--mid-bg) 30% 70%,var(--good-bg))}
@@ -99,13 +112,25 @@ a{color:var(--accent)}
     <p class="hint" id="sigtext"></p>
   </section>
 
+  <section class="panel" id="fc-panel" hidden>
+    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">
+      <h2>앞으로의 방향 신호</h2>
+      <div class="seg" id="fc-hz" role="group" aria-label="기간"></div>
+    </div>
+    <div id="fc-head"></div>
+    <div id="fc-factors" class="fcf"></div>
+    <div id="fc-meta" class="hint"></div>
+    <div id="fc-note"></div>
+    <p class="hint">요인들이 지금 어느 쪽을 가리키는지 규칙으로 합산한 참고 신호입니다. 환율은 예측이 잘 맞지 않는 대상이라, 목표 환율은 내지 않고 방향과 근거만 보여 줍니다. 송금 결정의 유일한 근거로 쓰지 마세요.</p>
+  </section>
+
   <section class="panel">
     <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">
       <h2>NZD/KRW 추이</h2>
       <div class="seg" id="range" role="group" aria-label="기간"></div>
     </div>
     <div id="chart"></div>
-    <div class="legend"><span><i style="background:var(--accent)"></i>NZD/KRW</span><span><i style="background:var(--muted)"></i>30일 평균</span><span><i style="background:var(--good)"></i>목표(이상)</span><span><i style="background:var(--bad)"></i>목표(이하)</span></div>
+    <div class="legend"><span><i style="background:var(--accent)"></i>NZD/KRW</span><span><i style="background:var(--muted)"></i>30일 평균</span><span><i style="background:var(--good)"></i>목표(이상)</span><span><i style="background:var(--bad)"></i>목표(이하)</span><span><i style="background:var(--accent);opacity:.3"></i>앞으로의 범위(68%·90%)</span></div>
   </section>
 
   <section class="panel">
@@ -155,7 +180,8 @@ const $=(s)=>document.querySelector(s);
 const esc=(s)=>String(s??'').replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const f2=(v)=>v==null?'—':v.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const pc=(v)=>v==null?'—':`<span class="${v>=0?'up':'down'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
-let D=null, range=365;
+let D=null, range=365, fhz='mid', FN=null;
+try{fhz=localStorage.getItem('fx.fhz')||'mid'}catch(e){}
 try{range=+localStorage.getItem('fx.range')||365}catch(e){}
 const RANGES=[[91,'3개월'],[182,'6개월'],[365,'1년'],[730,'2년']];
 
@@ -165,8 +191,10 @@ function chart(){
   const ds=idx.map((i)=>s.d[i]), vs=idx.map((i)=>s.KRW[i]);
   const ma=vs.map((_,j)=>{const a=idx[j],w=s.KRW.slice(Math.max(0,a-20),a+1);return w.reduce((x,y)=>x+y,0)/w.length});
   const T=D.targets||{}, extra=[T.nzd_krw_at_or_above,T.nzd_krw_at_or_below].filter((x)=>x!=null);
+  const fb=D.forecast&&D.forecast.horizons&&D.forecast.horizons[fhz]?D.forecast.horizons[fhz].band:null;
+  if(fb)extra.push(fb.lo90,fb.hi90);
   let lo=Math.min(...vs,...extra), hi=Math.max(...vs,...extra); const pad=(hi-lo)*.08||1; lo-=pad; hi+=pad;
-  const W=640,H=240,L=46,R=10,Tp=10,B=24;
+  const W=640,H=240,L=46,Tp=10,B=24,CW=fb?64:0,R=10+CW;
   const x=(i)=>L+(i/(ds.length-1||1))*(W-L-R), y=(v)=>Tp+(1-(v-lo)/(hi-lo))*(H-Tp-B);
   const path=(arr)=>arr.map((v,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
   const ticks=[0,1,2,3].map((k)=>lo+(hi-lo)*k/3).map((v)=>`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="currentColor" opacity=".08"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="currentColor" opacity=".6">${v.toFixed(0)}</text>`).join('');
@@ -180,7 +208,38 @@ function chart(){
     ${tl(T.nzd_krw_at_or_above,'var(--good)')}${tl(T.nzd_krw_at_or_below,'var(--bad)')}
     <path d="${path(ma)}" fill="none" stroke="var(--muted)" stroke-width="1.3" opacity=".8"/>
     <path d="${path(vs)}" fill="none" stroke="var(--accent)" stroke-width="2.2"/>
+    ${fb?(()=>{const x0=x(li),x1=W-10,y0=y(vs[li]);const cone=(a,c,o)=>`<path d="M${x0},${y0}L${x1},${y(a)}L${x1},${y(c)}Z" fill="var(--accent)" opacity="${o}"/>`;return cone(fb.hi90,fb.lo90,.12)+cone(fb.hi68,fb.lo68,.2)+`<text x="${x1}" y="${y(fb.hi90)-4}" text-anchor="end" font-size="10" fill="currentColor" opacity=".7">${fb.hi90.toFixed(0)}</text><text x="${x1}" y="${y(fb.lo90)+12}" text-anchor="end" font-size="10" fill="currentColor" opacity=".7">${fb.lo90.toFixed(0)}</text>`})():''}
     <circle cx="${x(li)}" cy="${y(vs[li])}" r="4" fill="var(--accent)"/></svg>`;
+}
+const FNAME={momentum:'추세',position:'범위 안 위치',rates:'금리 차(뉴질랜드−한국)',usd:'달러 강약',risk:'위험 선호(주식)',dairy:'유제품 가격',korea:'한국 증시·수출'};
+function forecast(){
+  const F=D.forecast, box=$('#fc-panel');
+  if(!F||!F.horizons){box.hidden=true;return}
+  box.hidden=false;
+  if(!F.horizons[fhz])fhz='mid';
+  const h=F.horizons[fhz];
+  $('#fc-hz').innerHTML=Object.entries(F.horizons).map(([k,v])=>`<button type="button" data-fhz="${k}" aria-pressed="${k===fhz}">${esc(v.name)}</button>`).join('');
+  const cls=h.score>=.12?'u':h.score<=-.12?'d':'';
+  const arrow=cls==='u'?'▲':cls==='d'?'▼':'●';
+  const used=h.factors.filter((f)=>f.score!=null).length;
+  $('#fc-head').innerHTML=`<div class="fch"><b class="${cls}">${arrow} ${esc(h.label)}</b><span>NZD/KRW · 앞으로 ${esc(h.name)}</span><span class="hint">요인 ${used}개 중 상승 ${h.up} · 하락 ${h.down} · 중립 ${h.neutral}${h.missing.length?` · 데이터 없음 ${h.missing.length}`:''}</span></div>
+    <p class="hint">${cls==='u'?'오르면 한국으로 보낼 때 유리해지고, 뉴질랜드로 보낼 때는 불리해져요.':cls==='d'?'내리면 뉴질랜드로 보낼 때 유리해지고, 한국으로 보낼 때는 불리해져요.':'요인들이 엇갈려 뚜렷한 방향이 없어요.'}</p>`;
+  let g='';
+  $('#fc-factors').innerHTML=h.factors.map((f)=>{
+    const head=f.group!==g?`<div class="fcg">${esc(g=f.group)}</div>`:'';
+    const w=f.score==null?0:Math.min(50,Math.abs(f.score)/2*50);
+    const bar=f.score==null?'<div class="fcb" style="opacity:.4"></div>':`<div class="fcb" role="img" aria-label="점수 ${f.score}"><i class="${f.score>=0?'u':'d'}" style="width:${w}%"></i></div>`;
+    return `${head}<div class="fcr"><span class="nm">${esc(FNAME[f.id]||f.id)} <span class="hint">비중 ${f.weight}</span></span>${bar}<span class="why">${esc(f.why)}</span></div>`}).join('');
+  const b=h.band, bt=h.backtest, lv=h.live||{};
+  const parts=[`앞으로 ${esc(fhz==='short'?'2주':fhz==='mid'?'3개월':'1년')} 뒤의 범위(과거 1년 변동성 기준): 68% ${f2(b.lo68)}~${f2(b.hi68)}원 · 90% ${f2(b.lo90)}~${f2(b.hi90)}원`];
+  parts.push(bt?`지난 2년 적중률(가격 요인만으로 계산): ${bt.rate}% (${bt.hit}/${bt.n}회, 50%가 동전 던지기). 한 방향으로 오래 움직인 기간이라 실제보다 높게 나올 수 있어요`:'지난 적중률: 이 기간은 과거 자료가 2년뿐이라 계산하지 않았어요');
+  parts.push(lv.n?`실제 기록: ${lv.hit}/${lv.n}회 적중${lv.open?` · 결과 대기 ${lv.open}건`:''}`:`실제 기록: 쌓는 중${lv.open?` (결과 대기 ${lv.open}건)`:''}`);
+  $('#fc-meta').innerHTML=parts.map((t)=>`<div>${t}</div>`).join('');
+  const n=FN, nb=$('#fc-note');
+  if(n&&n.summary){
+    const age=Math.floor((Date.now()-Date.parse(n.generated_at))/864e5), old=age>10;
+    nb.innerHTML=`<div class="fcn"><div class="eb">${old?`지난 해설 · ${age}일 전 (이번 주 해설은 아직 없어요)`:`이번 주 해설 · Claude · ${new Date(n.generated_at).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'})}`}</div><div>${esc(n.summary)}</div>${(n.points||[]).length?`<ul>${n.points.map((x)=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}${(n.events||[]).length?`<div class="eb" style="margin-top:8px">다가오는 일정</div><ul>${n.events.map((e)=>`<li><span class="num">${esc(e.date)}</span> ${esc(e.text)}</li>`).join('')}</ul>`:''}${(n.sources||[]).length?`<div class="eb" style="margin-top:8px">출처: ${n.sources.slice(0,6).map((x)=>/^https:\/\//.test(x.url)?`<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>`:esc(x.title)).join(' · ')}</div>`:''}</div>`;
+  } else nb.innerHTML='';
 }
 function calc(){
   if(!D)return;
@@ -199,9 +258,9 @@ function render(){
   $('#lo52').textContent=`1년 최저 ${f2(k.lo52)}`; $('#hi52').textContent=`1년 최고 ${f2(k.hi52)}`;
   const cls=(t)=>t.includes('유리')?'g':t.includes('불리')?'r':'';
   [['#s-kr',sg.to_kr],['#s-nz',sg.to_nz]].forEach(([id,t])=>{const e=$(id);e.className='sig '+cls(t);e.querySelector('b').textContent=t;e.querySelectorAll('.hint')[1].textContent=sg.trend});
-  $('#sigtext').textContent=`지금 NZD/KRW 는 ${sg.text}. 과거 위치일 뿐 앞으로의 방향을 예측하지 않습니다.`;
+  $('#sigtext').textContent=`지금 NZD/KRW 는 ${sg.text}. 이 줄은 과거 위치예요. 앞으로의 방향은 아래 '방향 신호'를 보세요.`;
   $('#range').innerHTML=RANGES.map(([d,l])=>`<button type="button" data-r="${d}" aria-pressed="${d===range}">${l}</button>`).join('');
-  chart(); calc();
+  forecast(); chart(); calc();
   const q=D.quotes;
   if(q&&q.providers&&q.providers.length){
     $('#q-sub').textContent=`NZ$${q.amount} 보낼 때 · ${new Date(q.fetched).toLocaleDateString('ko-KR')} 수집`;
@@ -211,9 +270,10 @@ function render(){
   const al=(D.alerts||[]).slice().reverse();
   $('#alerts').innerHTML=al.length?`<ul>${al.map((a)=>`<li><span class="num">${esc(a.date)}</span> ${esc(a.text)}</li>`).join('')}</ul>`:'<p class="hint">최근 60일 알림 없음</p>';
 }
-document.addEventListener('click',(e)=>{const b=e.target.closest('[data-r]');if(!b||!D)return;range=+b.dataset.r;try{localStorage.setItem('fx.range',range)}catch(err){};$('#range').querySelectorAll('button').forEach((x)=>x.setAttribute('aria-pressed',String(+x.dataset.r===range)));chart()});
+document.addEventListener('click',(e)=>{const f=e.target.closest('[data-fhz]');if(f&&D){fhz=f.dataset.fhz;try{localStorage.setItem('fx.fhz',fhz)}catch(err){};forecast();chart();return}const b=e.target.closest('[data-r]');if(!b||!D)return;range=+b.dataset.r;try{localStorage.setItem('fx.range',range)}catch(err){};$('#range').querySelectorAll('button').forEach((x)=>x.setAttribute('aria-pressed',String(+x.dataset.r===range)));chart()});
 document.querySelectorAll('[data-num]').forEach((el)=>NumFmt.attach(el));
 ['#c-dir','#c-amt','#c-fee','#c-mar'].forEach((s)=>$(s).addEventListener('input',calc));
+fetch('notes/fx-notes.json',{cache:'no-store'}).then((r)=>r.ok?r.json():null).catch(()=>null).then((n)=>{FN=n;if(D)forecast()});
 fetch('data/fx.json',{cache:'no-store'}).then((r)=>r.ok?r.json():Promise.reject(r.status)).then((d)=>{D=d;render();window.__FX=d;window.dispatchEvent(new CustomEvent('fx:data',{detail:d}))})
   .catch(()=>{$('#asof').textContent='';document.querySelector('.wrap').insertAdjacentHTML('afterbegin','<div class="err">환율 데이터를 아직 만들지 못했습니다. 첫 자동 갱신 뒤에 다시 열어 주세요.</div>')});
 })();

@@ -11,6 +11,7 @@ import json
 import os
 import statistics
 import sys
+import urllib.parse
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -66,6 +67,59 @@ def wise_quotes(amount: int = 1000) -> dict | None:
     return {"amount": amount, "from": "NZD", "to": "KRW", "providers": rows[:8],
             "source": "Wise 비교(공개 API) — Wise 가 수집한 업체 견적이며 실제 송금 시점과 다를 수 있음",
             "fetched": datetime.now(timezone.utc).isoformat(timespec="minutes")}
+
+
+def get_text(url: str, timeout: int = 30) -> str:
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8")
+
+
+def _try(fn, name: str):
+    """보조 데이터는 못 받아도 환율 갱신을 막지 않는다(그 요인만 화면에서 '데이터 없음')."""
+    try:
+        v = fn()
+        if v:
+            return v
+        print(f"::warning::{name}: 빈 응답")
+    except Exception as e:  # noqa: BLE001
+        print(f"::warning::{name}: {str(e)[:120]}")
+    return None
+
+
+def usd_basket(start: str):
+    """달러 지수 대용: 유로·엔·파운드 대비 달러 가치의 기하평균(시작일 = 100)."""
+    j = get_json(f"https://api.frankfurter.dev/v1/{start}..?base=USD&symbols=EUR,JPY,GBP")
+    rows = sorted(j.get("rates", {}).items())
+    base = rows[0][1]
+    return [(d, 100 * (r["EUR"] / base["EUR"] * r["JPY"] / base["JPY"] * r["GBP"] / base["GBP"]) ** (1 / 3)) for d, r in rows if len(r) == 3]
+
+
+def yahoo_series(symbol: str):
+    j = get_json(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}?range=2y&interval=1d")
+    res = j["chart"]["result"][0]
+    closes = res["indicators"]["quote"][0]["close"]
+    return [(datetime.fromtimestamp(t, timezone.utc).date().isoformat(), float(c)) for t, c in zip(res["timestamp"], closes) if c]
+
+
+def fred_monthly(series_id: str):
+    """FRED 공개 CSV(키 불필요): 월별 값 [(YYYY-MM, 값)]."""
+    out = []
+    for line in get_text(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}&cosd={date.today().year - 3}-01-01").splitlines()[1:]:
+        d, _, v = line.partition(",")
+        try:
+            out.append((d[:7], float(v)))
+        except ValueError:
+            continue
+    return out
+
+
+def fetch_extra(start: str) -> dict:
+    """방향 신호용 보조 데이터. 하나씩 따로 시도한다."""
+    rates = {c: _try(lambda sid=sid: fred_monthly(sid), f"fred {c}") for c, sid in (("NZ", "IR3TIB01NZM156N"), ("KR", "IR3TIB01KRM156N"), ("US", "IR3TIB01USM156N"))}
+    return {"usd": _try(lambda: usd_basket(start), "usd basket"), "spx": _try(lambda: yahoo_series("^GSPC"), "yahoo spx"),
+            "kospi": _try(lambda: yahoo_series("^KS11"), "yahoo kospi"), "milk": _try(lambda: yahoo_series("DC=F"), "yahoo milk"),
+            "rates": rates if rates["NZ"] and rates["KR"] else None}
 
 
 def pct_rank(xs: list[float], v: float) -> float:
@@ -127,7 +181,7 @@ def notify(lines: list[str]) -> None:
         print("telegram failed:", e, file=sys.stderr)
 
 
-def build(rates: dict, prev: dict | None, cfg: dict, quotes: dict | None, now: datetime) -> dict:
+def build(rates: dict, prev: dict | None, cfg: dict, quotes: dict | None, now: datetime, extra: dict | None = None) -> dict:
     pairs = {sym: summarize(rates, sym) for sym in PAIRS}
     k = pairs["KRW"]
     sig = signal(k)
@@ -138,7 +192,25 @@ def build(rates: dict, prev: dict | None, cfg: dict, quotes: dict | None, now: d
     series = {"d": [d for d in rates if d >= one_year], **{sym: [rates[d].get(sym) for d in rates if d >= one_year] for sym in PAIRS}}
     return {"generated_at": now.isoformat(timespec="minutes"), "source": "ECB 기준환율 (frankfurter.dev, 평일 하루 1회 고시)",
             "pairs": pairs, "signal": sig, "alerts": hist[-20:], "new_alerts": new_alerts,
-            "targets": cfg.get("alerts") or {}, "quotes": quotes or (prev or {}).get("quotes"), "series": series}
+            "targets": cfg.get("alerts") or {}, "quotes": quotes or (prev or {}).get("quotes"), "series": series,
+            "forecast": _forecast(rates, extra, prev)}
+
+
+def _forecast(rates: dict, extra: dict | None, prev: dict | None) -> dict | None:
+    """방향 신호(규칙 기반). 계산이 실패해도 환율 데이터는 그대로 내보낸다."""
+    try:
+        import forecast as fc
+        k = [(d, r["KRW"]) for d, r in rates.items() if "KRW" in r]
+        if len(k) < 300:
+            return (prev or {}).get("forecast")
+        out = fc.build(k, extra or {}, ((prev or {}).get("forecast") or {}).get("log"))
+        ex = extra or {}
+        out["inputs"] = {n: (ex[n][-1][0] if ex.get(n) else None) for n in ("usd", "spx", "kospi", "milk")}
+        out["inputs"]["rates"] = ex["rates"]["NZ"][-1][0] if ex.get("rates") else None
+        return out
+    except Exception as e:  # noqa: BLE001
+        print(f"::warning::forecast: {str(e)[:160]}")
+        return (prev or {}).get("forecast")
 
 
 def main() -> int:
@@ -151,11 +223,13 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         print(f"::warning::{e}")
         return 0  # 이전 데이터 유지
-    data = build(rates, prev, cfg, wise_quotes(int(cfg.get("send_amount", 1000))), now)
+    data = build(rates, prev, cfg, wise_quotes(int(cfg.get("send_amount", 1000))), now, fetch_extra(start))
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     notify(data["new_alerts"])
     k = data["pairs"]["KRW"]
+    fcst = data.get("forecast") or {}
+    print("forecast:", {h: (v["label"], v["score"], v["missing"]) for h, v in (fcst.get("horizons") or {}).items()})
     print(f"NZD/KRW {k['last']} ({k['date']}) · 1y pct {k['pct1y']} · alerts {len(data['new_alerts'])} · quotes {'yes' if data['quotes'] else 'no'}")
     return 0
 
