@@ -198,7 +198,7 @@ def update_log(log: list, today: str, k: Series, result: dict) -> tuple[list, di
     return log, stats
 
 
-def build(k: Series, extra: dict, prev_log: list | None = None) -> dict:
+def build(k: Series, extra: dict, prev_log: list | None = None, prev_hist: list | None = None) -> dict:
     out, res = {}, {}
     for hz, meta in HORIZONS.items():
         fs = factors(k, extra, hz)
@@ -209,4 +209,7 @@ def build(k: Series, extra: dict, prev_log: list | None = None) -> dict:
     log, stats = update_log(prev_log or [], k[-1][0], k, res)
     for hz in out:
         out[hz]["live"] = stats[hz]
-    return {"asof": k[-1][0], "horizons": out, "log": log}
+    # 요인 변화 추적용: 날짜별 요인 점수(하루 한 줄, 최근 45일)
+    snap = {"date": k[-1][0], "h": {hz: {"label": v["label"], "f": {f["id"]: f["score"] for f in v["factors"]}} for hz, v in out.items()}}
+    hist = [h for h in (prev_hist or []) if h.get("date") != snap["date"]][-44:] + [snap]
+    return {"asof": k[-1][0], "horizons": out, "log": log, "hist": hist}

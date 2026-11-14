@@ -39,6 +39,23 @@ h1{margin:0;font-size:20px} h2{margin:0;font-size:16px} p{margin:0}
 .sigs{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
 .sig{border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px;background:var(--mid-bg)}
 .sig b{font-size:18px}
+[data-tab]{display:none} body[data-view="today"] [data-tab="today"],body[data-view="outlook"] [data-tab="outlook"],body[data-view="send"] [data-tab="send"],body[data-view="log"] [data-tab="log"]{display:flex}
+[data-tab][hidden]{display:none!important}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0)}
+.tabs button{border:0;border-radius:0;background:transparent;padding:10px 4px 9px;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:2px;align-items:center}
+.tabs button span{font-size:17px;line-height:1}
+.tabs button[aria-current="page"]{color:var(--ink);font-weight:600;box-shadow:inset 0 2px 0 var(--accent)}
+body{padding-bottom:72px}
+.tda{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.tda div{border-radius:12px;padding:12px;background:var(--mid-bg);display:flex;flex-direction:column;gap:4px}
+.tda b{font-size:15.5px;line-height:1.4}
+.tdh{display:grid;gap:6px}
+.tdh button{display:grid;grid-template-columns:72px 1fr auto;gap:8px;align-items:center;text-align:left;border-radius:10px;padding:8px 12px}
+.tdh .u{color:var(--good)} .tdh .d{color:var(--bad)}
+.ev{display:grid;grid-template-columns:58px 1fr;gap:8px;font-size:13.5px;padding:4px 0}
+.ev b{font-family:var(--mono);font-weight:500;color:var(--accent)}
+.chg2{font-size:13px;display:grid;gap:4px;border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.more{align-self:flex-start}
 .fch{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}
 .fch b{font-size:22px} .fch b.u{color:var(--good)} .fch b.d{color:var(--bad)}
 .fcf{display:grid;gap:10px}
@@ -96,7 +113,7 @@ a{color:var(--accent)}
     <h1>💱 FX Radar</h1><span class="hint" id="asof">불러오는 중…</span>
   </header>
 
-  <section class="panel" aria-label="지금 환율">
+  <section class="panel" data-tab="today" aria-label="지금 환율">
     <div class="hero">
       <div><p class="hint">NZD 1 = 원 (ECB 기준환율)</p><div class="rate" id="rate">—</div></div>
       <div class="chg" id="chg"></div>
@@ -112,19 +129,28 @@ a{color:var(--accent)}
     <p class="hint" id="sigtext"></p>
   </section>
 
-  <section class="panel" id="fc-panel" hidden>
+  <section class="panel" data-tab="today" id="td-panel" hidden>
+    <h2>지금 보낼까, 기다릴까</h2>
+    <div id="td-advice" class="tda"></div>
+    <div id="td-hz" class="tdh"></div>
+    <div><div class="fcg">다가오는 일정</div><div id="td-events"></div></div>
+    <p class="hint">위치(과거 1년)와 방향 신호(규칙)를 합친 참고 문장이에요. 자세한 근거는 '전망' 탭에 있어요.</p>
+  </section>
+
+  <section class="panel" data-tab="outlook" id="fc-panel" hidden>
     <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">
       <h2>앞으로의 방향 신호</h2>
       <div class="seg" id="fc-hz" role="group" aria-label="기간"></div>
     </div>
     <div id="fc-head"></div>
     <div id="fc-factors" class="fcf"></div>
+    <div id="fc-chg"></div>
     <div id="fc-meta" class="hint"></div>
     <div id="fc-note"></div>
     <p class="hint">요인들이 지금 어느 쪽을 가리키는지 규칙으로 합산한 참고 신호입니다. 환율은 예측이 잘 맞지 않는 대상이라, 목표 환율은 내지 않고 방향과 근거만 보여 줍니다. 송금 결정의 유일한 근거로 쓰지 마세요.</p>
   </section>
 
-  <section class="panel">
+  <section class="panel" data-tab="outlook">
     <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">
       <h2>NZD/KRW 추이</h2>
       <div class="seg" id="range" role="group" aria-label="기간"></div>
@@ -133,7 +159,13 @@ a{color:var(--accent)}
     <div class="legend"><span><i style="background:var(--accent)"></i>NZD/KRW</span><span><i style="background:var(--muted)"></i>30일 평균</span><span><i style="background:var(--good)"></i>목표(이상)</span><span><i style="background:var(--bad)"></i>목표(이하)</span><span><i style="background:var(--accent);opacity:.3"></i>앞으로의 범위(68%·90%)</span></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" data-tab="outlook" id="dc-panel" hidden>
+    <h2>누구 때문에 움직였나 <span class="hint">NZD/KRW = NZD/USD × USD/KRW</span></h2>
+    <div class="tbl" id="decomp"></div>
+    <p class="hint" id="dc-text"></p>
+  </section>
+
+  <section class="panel" data-tab="send">
     <h2>송금 계산기</h2>
     <div class="calc">
       <label for="c-dir">방향<select id="c-dir"><option value="nz2kr">NZD → KRW</option><option value="kr2nz">KRW → NZD</option></select></label>
@@ -145,14 +177,29 @@ a{color:var(--accent)}
     <p class="hint">기준환율에 내가 쓰는 업체의 수수료와 마진을 넣어 계산합니다. 업체별 실제 견적은 아래 표를 보세요.</p>
   </section>
 
-  <section class="panel" id="q-panel">
+  <section class="panel" data-tab="send" id="q-panel">
     <h2>업체별 견적 <span class="hint" id="q-sub"></span></h2>
     <div class="tbl" id="quotes"></div>
   </section>
 
-  <section class="panel" id="planner" aria-label="큰돈 송금 플래너"><h2>큰돈 송금 플래너</h2><p class="hint">불러오는 중…</p></section>
+  <section class="panel" data-tab="send" id="sp-panel" hidden>
+    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">
+      <h2>한 번에 보낼까, 나눠 보낼까</h2>
+      <div class="seg" id="sp-n" role="group" aria-label="나누는 횟수"></div>
+    </div>
+    <div class="tbl" id="split"></div>
+    <p class="hint">위 '전망' 탭에서 고른 기간 동안 같은 간격으로 나눠 보낼 때 평균 환율이 놓일 범위(68%)예요. 과거 1년 변동성만으로 계산했고 방향은 넣지 않았어요. 나눌수록 평균은 그대로지만 범위가 좁아져요.</p>
+  </section>
 
-  <section class="panel">
+  <section class="panel" data-tab="send" id="planner" aria-label="큰돈 송금 플래너"><h2>큰돈 송금 플래너</h2><p class="hint">불러오는 중…</p></section>
+
+  <section class="panel" data-tab="log" id="lg-panel" hidden>
+    <h2>지난 신호 성적표</h2>
+    <div id="lg-sum" class="hint"></div>
+    <div class="tbl" id="siglog"></div>
+  </section>
+
+  <section class="panel" data-tab="log">
     <h2>다른 통화와 알림 기록</h2>
     <div class="tbl" id="others"></div>
     <div id="alerts"></div>
@@ -161,6 +208,7 @@ a{color:var(--accent)}
 
   <footer class="hint" id="foot">ECB 기준환율은 유럽 시간 오후에 하루 한 번 고시되며 주말·휴일에는 바뀌지 않습니다. 실제 송금 환율과 다르므로 참고용으로 보세요.</footer>
 </div>
+<nav class="tabs" id="tabs" aria-label="화면 선택"></nav>
 <script>
 // 숫자 입력칸에 천 단위 쉼표(1,000,000) 표시: 입력하는 동안 쉼표를 다시 넣고, 계산할 때는 쉼표를 뺀 값을 씁니다
 window.NumFmt=(function(){
@@ -180,7 +228,8 @@ const $=(s)=>document.querySelector(s);
 const esc=(s)=>String(s??'').replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const f2=(v)=>v==null?'—':v.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const pc=(v)=>v==null?'—':`<span class="${v>=0?'up':'down'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
-let D=null, range=365, fhz='mid', FN=null;
+let D=null, range=365, fhz='mid', FN=null, view='today', spn=4, fcAll=false;
+const VIEWS=[['today','오늘','🧭'],['outlook','전망','📈'],['send','송금','💸'],['log','기록','🗂️']];
 try{fhz=localStorage.getItem('fx.fhz')||'mid'}catch(e){}
 try{range=+localStorage.getItem('fx.range')||365}catch(e){}
 const RANGES=[[91,'3개월'],[182,'6개월'],[365,'1년'],[730,'2년']];
@@ -225,11 +274,14 @@ function forecast(){
   $('#fc-head').innerHTML=`<div class="fch"><b class="${cls}">${arrow} ${esc(h.label)}</b><span>NZD/KRW · 앞으로 ${esc(h.name)}</span><span class="hint">요인 ${used}개 중 상승 ${h.up} · 하락 ${h.down} · 중립 ${h.neutral}${h.missing.length?` · 데이터 없음 ${h.missing.length}`:''}</span></div>
     <p class="hint">${cls==='u'?'오르면 한국으로 보낼 때 유리해지고, 뉴질랜드로 보낼 때는 불리해져요.':cls==='d'?'내리면 뉴질랜드로 보낼 때 유리해지고, 한국으로 보낼 때는 불리해져요.':'요인들이 엇갈려 뚜렷한 방향이 없어요.'}</p>`;
   let g='';
-  $('#fc-factors').innerHTML=h.factors.map((f)=>{
+  const top=new Set(h.factors.filter((f)=>f.score!=null).sort((a,b)=>Math.abs(b.score)*b.weight-Math.abs(a.score)*a.weight).slice(0,3).map((f)=>f.id));
+  const shown=fcAll?h.factors:h.factors.filter((f)=>top.has(f.id));
+  $('#fc-factors').innerHTML=shown.map((f)=>{
     const head=f.group!==g?`<div class="fcg">${esc(g=f.group)}</div>`:'';
     const w=f.score==null?0:Math.min(50,Math.abs(f.score)/2*50);
     const bar=f.score==null?'<div class="fcb" style="opacity:.4"></div>':`<div class="fcb" role="img" aria-label="점수 ${f.score}"><i class="${f.score>=0?'u':'d'}" style="width:${w}%"></i></div>`;
-    return `${head}<div class="fcr"><span class="nm">${esc(FNAME[f.id]||f.id)} <span class="hint">비중 ${f.weight}</span></span>${bar}<span class="why">${esc(f.why)}</span></div>`}).join('');
+    return `${head}<div class="fcr"><span class="nm">${esc(FNAME[f.id]||f.id)} <span class="hint">비중 ${f.weight}</span></span>${bar}<span class="why">${esc(f.why)}</span></div>`}).join('')+(h.factors.length>shown.length||fcAll?`<button type="button" class="more" data-fcall>${fcAll?'영향 큰 요인만 보기':`요인 ${h.factors.length}개 모두 보기`}</button>`:'');
+  fcChanges();
   const b=h.band, bt=h.backtest, lv=h.live||{};
   const parts=[`앞으로 ${esc(fhz==='short'?'2주':fhz==='mid'?'3개월':'1년')} 뒤의 범위(과거 1년 변동성 기준): 68% ${f2(b.lo68)}~${f2(b.hi68)}원 · 90% ${f2(b.lo90)}~${f2(b.hi90)}원`];
   parts.push(bt?`지난 2년 적중률(가격 요인만으로 계산): ${bt.rate}% (${bt.hit}/${bt.n}회, 50%가 동전 던지기). 한 방향으로 오래 움직인 기간이라 실제보다 높게 나올 수 있어요`:'지난 적중률: 이 기간은 과거 자료가 2년뿐이라 계산하지 않았어요');
@@ -240,6 +292,69 @@ function forecast(){
     const age=Math.floor((Date.now()-Date.parse(n.generated_at))/864e5), old=age>10;
     nb.innerHTML=`<div class="fcn"><div class="eb">${old?`지난 해설 · ${age}일 전 (이번 주 해설은 아직 없어요)`:`이번 주 해설 · Claude · ${new Date(n.generated_at).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'})}`}</div><div>${esc(n.summary)}</div>${(n.points||[]).length?`<ul>${n.points.map((x)=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}${(n.events||[]).length?`<div class="eb" style="margin-top:8px">다가오는 일정</div><ul>${n.events.map((e)=>`<li><span class="num">${esc(e.date)}</span> ${esc(e.text)}</li>`).join('')}</ul>`:''}${(n.sources||[]).length?`<div class="eb" style="margin-top:8px">출처: ${n.sources.slice(0,6).map((x)=>/^https:\/\//.test(x.url)?`<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>`:esc(x.title)).join(' · ')}</div>`:''}</div>`;
   } else nb.innerHTML='';
+}
+function setView(v,push){
+  view=VIEWS.some((x)=>x[0]===v)?v:'today';
+  document.body.dataset.view=view;
+  $('#tabs').innerHTML=VIEWS.map(([k,l,i])=>`<button type="button" data-view="${k}" ${k===view?'aria-current="page"':''}><span aria-hidden="true">${i}</span>${l}</button>`).join('');
+  if(push){try{history.replaceState(null,'','#'+view)}catch(e){}window.scrollTo(0,0)}
+  if(D&&view==='outlook')chart();
+}
+const dirOf=(h)=>h?(h.score>=.12?1:h.score<=-.12?-1:0):0;
+function today(){
+  const F=D.forecast, box=$('#td-panel');
+  if(!F||!F.horizons){box.hidden=true;return}
+  box.hidden=false;
+  const sg=D.signal, s=dirOf(F.horizons.short), m=dirOf(F.horizons.mid), d=s+m;   // 단기·중기 방향 합
+  // 한국으로(NZD→KRW)는 환율이 높을수록, 뉴질랜드로(KRW→NZD)는 낮을수록 유리
+  const line=(good,want)=>{
+    const helps=d*want;   // 앞으로의 방향이 내게 유리해지는 쪽이면 +
+    if(helps>0) return good.includes('불리')?'지금은 불리한 수준이고, 신호는 나아지는 쪽이에요. 급한 돈만 보내고 나머지는 기다리거나 나눠 보내기.':'신호는 더 나아지는 쪽이에요. 급하지 않으면 나눠 보내기.';
+    if(helps<0) return good.includes('유리')?'지금이 유리한 수준이고, 신호는 나빠지는 쪽이에요. 미루기보다 먼저 보내는 쪽.':good.includes('불리')?'이미 불리한 수준인데 신호도 더 나빠지는 쪽이에요. 급한 돈만 보내고, 나머지는 여러 번에 나눠 보내기.':'신호는 더 불리해지는 쪽이에요. 보낼 돈이면 일부를 먼저 보내고 나머지는 나눠 보내기.';
+    return good.includes('유리')?'지금이 유리한 수준이고 방향 신호는 엇갈려요. 보낼 돈이면 지금도 괜찮아요.':'방향 신호가 엇갈려요. 날짜를 나눠 보내면 평균에 가까워져요.';
+  };
+  $('#td-advice').innerHTML=`<div><span class="hint">🇳🇿→🇰🇷 한국으로 보낼 때 · 지금 ${esc(sg.to_kr)}</span><b>${line(sg.to_kr,1)}</b></div><div><span class="hint">🇰🇷→🇳🇿 뉴질랜드로 보낼 때 · 지금 ${esc(sg.to_nz)}</span><b>${line(sg.to_nz,-1)}</b></div>`;
+  $('#td-hz').innerHTML=Object.entries(F.horizons).map(([k,h])=>{const c=dirOf(h);return `<button type="button" data-go="${k}"><span class="hint">${esc(h.name)}</span><b class="${c>0?'u':c<0?'d':''}">${c>0?'▲':c<0?'▼':'●'} ${esc(h.label)}</b><span class="hint">상승 ${h.up} · 하락 ${h.down} ›</span></button>`}).join('');
+  const now=new Date().toLocaleDateString('sv-SE',{timeZone:'Pacific/Auckland'});
+  const ev=((FN&&FN.events)||[]).filter((e)=>e.date>=now).sort((a,b)=>a.date<b.date?-1:1).slice(0,5);
+  $('#td-events').innerHTML=ev.length?ev.map((e)=>{const n=Math.round((Date.parse(e.date)-Date.parse(now))/864e5);return `<div class="ev"><b>${n===0?'오늘':'D-'+n}</b><span>${esc(e.text)} <span class="hint">${esc(e.date.slice(5).replace('-','/'))}</span></span></div>`}).join(''):'<p class="hint">중앙은행 회의와 유제품 경매 일정은 매주 월요일 해설이 써지면 여기에 표시돼요.</p>';
+}
+function decomp(){
+  const dc=D.forecast&&D.forecast.decomp, box=$('#dc-panel');
+  if(!dc){box.hidden=true;return}
+  box.hidden=false;
+  $('#decomp').innerHTML=`<table><thead><tr><th>기간</th><th class="r">NZD/KRW</th><th class="r">뉴질랜드달러 쪽<br><small>NZD/USD</small></th><th class="r">원화 쪽<br><small>USD/KRW</small></th></tr></thead><tbody>${Object.entries(dc).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="r num">${pc(v.nzdkrw)}</td><td class="r num">${pc(v.nzdusd)}</td><td class="r num">${pc(v.usdkrw)}</td></tr>`).join('')}</tbody></table>`;
+  const m=dc['1개월']||Object.values(dc)[0];
+  const who=Math.abs(m.nzdusd)>Math.abs(m.usdkrw)*1.5?'뉴질랜드달러가 달러 대비 움직인 영향이 더 컸어요':Math.abs(m.usdkrw)>Math.abs(m.nzdusd)*1.5?'원화가 달러 대비 움직인 영향이 더 컸어요':'두 쪽 영향이 비슷했어요';
+  $('#dc-text').textContent=`최근 1개월은 ${who}. USD/KRW 가 오르면(원화 약세) NZD/KRW 도 오르고, NZD/USD 가 내리면(뉴질랜드달러 약세) NZD/KRW 는 내려요.${D.forecast.usdkrw?` 지금 USD/KRW 는 약 ${D.forecast.usdkrw.toLocaleString('ko-KR')}원.`:''}`;
+}
+function fcChanges(){
+  const hs=(D.forecast.hist||[]), cur=hs[hs.length-1], box=$('#fc-chg');
+  const old=[...hs].reverse().find((x)=>cur&&Date.parse(cur.date)-Date.parse(x.date)>=6*864e5);
+  if(!cur||!old){box.innerHTML='<p class="hint">요인 변화는 기록이 일주일 쌓이면 표시돼요.</p>';return}
+  const st=(v)=>v==null?'데이터 없음':v>=.5?'상승 쪽':v<=-.5?'하락 쪽':'중립';
+  const a=old.h[fhz]||{f:{}}, b=cur.h[fhz]||{f:{}};
+  const rows=Object.keys(b.f).filter((k)=>st(a.f[k])!==st(b.f[k])&&a.f[k]!==undefined).map((k)=>`<div>${esc(FNAME[k]||k)}: ${st(a.f[k])} → <b>${st(b.f[k])}</b></div>`);
+  if(a.label&&a.label!==b.label)rows.unshift(`<div>종합 신호: ${esc(a.label)} → <b>${esc(b.label)}</b></div>`);
+  box.innerHTML=`<div class="chg2"><span class="hint">${esc(old.date.slice(5).replace('-','/'))} 이후 달라진 점</span>${rows.join('')||'<div>달라진 요인이 없어요.</div>'}</div>`;
+}
+function split(){
+  const F=D.forecast, box=$('#sp-panel');
+  if(!F||!F.horizons){box.hidden=true;return}
+  box.hidden=false;
+  const h=F.horizons[fhz]||F.horizons.mid, last=D.pairs.KRW.last, sd=Math.log(h.band.hi68/last)/Math.sqrt(h.days);
+  $('#sp-n').innerHTML=[2,4,8].map((n)=>`<button type="button" data-spn="${n}" aria-pressed="${n===spn}">${n}번</button>`).join('');
+  const avgSd=(n)=>{let v=0;for(let i=0;i<n;i++)for(let j=0;j<n;j++)v+=Math.min(i,j)*h.days/n;return sd*Math.sqrt(v)/n};
+  const row=(l,s,note)=>`<tr><td>${l}</td><td class="r num">${s?`${f2(last*Math.exp(-s))} ~ ${f2(last*Math.exp(s))}`:f2(last)}</td><td class="r num">${s?'±'+(100*(Math.exp(s)-1)).toFixed(1)+'%':'확정'}</td><td>${note}</td></tr>`;
+  $('#split').innerHTML=`<table><thead><tr><th>${esc(h.name)} 동안</th><th class="r">평균 환율 범위(68%)</th><th class="r">폭</th><th></th></tr></thead><tbody>${row('오늘 한 번에',0,'지금 환율로 확정')}${row(`${spn}번 나눠서`,avgSd(spn),'첫 회는 오늘')}${row('기간 끝에 한 번에',sd*Math.sqrt(h.days),'가장 넓은 범위')}</tbody></table>`;
+}
+function siglog(){
+  const F=D.forecast, box=$('#lg-panel');
+  if(!F||!F.log){box.hidden=true;return}
+  box.hidden=false;
+  const hz=F.horizons, lg=F.log.slice().reverse();
+  $('#lg-sum').innerHTML=Object.entries(hz).map(([k,h])=>`${esc(h.name)}: ${h.live&&h.live.n?`${h.live.hit}/${h.live.n}회 적중`:'채점 전'}${h.live&&h.live.open?` · 대기 ${h.live.open}건`:''}`).join(' · ');
+  $('#siglog').innerHTML=lg.length?`<table><thead><tr><th>신호일</th><th>기간</th><th>방향</th><th class="r">그날 환율</th><th>결과</th></tr></thead><tbody>${lg.slice(0,40).map((e)=>`<tr><td class="num">${esc(e.date)}</td><td>${esc((hz[e.hz]||{}).name||e.hz)}</td><td class="${e.dir>0?'up':'down'}">${e.dir>0?'▲ 상승':'▼ 하락'}</td><td class="r num">${f2(e.rate)}</td><td>${e.ok==null?'<span class="hint">대기</span>':e.ok?'<span class="up">적중</span>':'<span class="down">빗나감</span>'}</td></tr>`).join('')}</tbody></table>`:'<p class="hint">아직 기록된 신호가 없어요. 중립이 아닌 신호가 나온 날부터 쌓여요.</p>';
 }
 function calc(){
   if(!D)return;
@@ -258,9 +373,9 @@ function render(){
   $('#lo52').textContent=`1년 최저 ${f2(k.lo52)}`; $('#hi52').textContent=`1년 최고 ${f2(k.hi52)}`;
   const cls=(t)=>t.includes('유리')?'g':t.includes('불리')?'r':'';
   [['#s-kr',sg.to_kr],['#s-nz',sg.to_nz]].forEach(([id,t])=>{const e=$(id);e.className='sig '+cls(t);e.querySelector('b').textContent=t;e.querySelectorAll('.hint')[1].textContent=sg.trend});
-  $('#sigtext').textContent=`지금 NZD/KRW 는 ${sg.text}. 이 줄은 과거 위치예요. 앞으로의 방향은 아래 '방향 신호'를 보세요.`;
+  $('#sigtext').textContent=`지금 NZD/KRW 는 ${sg.text}. 이 줄은 과거 위치예요.`;
   $('#range').innerHTML=RANGES.map(([d,l])=>`<button type="button" data-r="${d}" aria-pressed="${d===range}">${l}</button>`).join('');
-  forecast(); chart(); calc();
+  forecast(); today(); decomp(); split(); siglog(); chart(); calc();
   const q=D.quotes;
   if(q&&q.providers&&q.providers.length){
     $('#q-sub').textContent=`NZ$${q.amount} 보낼 때 · ${new Date(q.fetched).toLocaleDateString('ko-KR')} 수집`;
@@ -270,10 +385,16 @@ function render(){
   const al=(D.alerts||[]).slice().reverse();
   $('#alerts').innerHTML=al.length?`<ul>${al.map((a)=>`<li><span class="num">${esc(a.date)}</span> ${esc(a.text)}</li>`).join('')}</ul>`:'<p class="hint">최근 60일 알림 없음</p>';
 }
-document.addEventListener('click',(e)=>{const f=e.target.closest('[data-fhz]');if(f&&D){fhz=f.dataset.fhz;try{localStorage.setItem('fx.fhz',fhz)}catch(err){};forecast();chart();return}const b=e.target.closest('[data-r]');if(!b||!D)return;range=+b.dataset.r;try{localStorage.setItem('fx.range',range)}catch(err){};$('#range').querySelectorAll('button').forEach((x)=>x.setAttribute('aria-pressed',String(+x.dataset.r===range)));chart()});
+document.addEventListener('click',(e)=>{const tv=e.target.closest('[data-view]');if(tv){setView(tv.dataset.view,true);return}
+  const go=e.target.closest('[data-go]');if(go&&D){fhz=go.dataset.go;forecast();split();setView('outlook',true);return}
+  if(e.target.closest('[data-fcall]')&&D){fcAll=!fcAll;forecast();return}
+  const sn=e.target.closest('[data-spn]');if(sn&&D){spn=+sn.dataset.spn;split();return}
+  const f=e.target.closest('[data-fhz]');if(f&&D){fhz=f.dataset.fhz;try{localStorage.setItem('fx.fhz',fhz)}catch(err){};forecast();split();chart();return}const b=e.target.closest('[data-r]');if(!b||!D)return;range=+b.dataset.r;try{localStorage.setItem('fx.range',range)}catch(err){};$('#range').querySelectorAll('button').forEach((x)=>x.setAttribute('aria-pressed',String(+x.dataset.r===range)));chart()});
 document.querySelectorAll('[data-num]').forEach((el)=>NumFmt.attach(el));
 ['#c-dir','#c-amt','#c-fee','#c-mar'].forEach((s)=>$(s).addEventListener('input',calc));
-fetch('notes/fx-notes.json',{cache:'no-store'}).then((r)=>r.ok?r.json():null).catch(()=>null).then((n)=>{FN=n;if(D)forecast()});
+fetch('notes/fx-notes.json',{cache:'no-store'}).then((r)=>r.ok?r.json():null).catch(()=>null).then((n)=>{FN=n;if(D){forecast();today()}});
+setView((location.hash||'').slice(1)||'today');
+addEventListener('hashchange',()=>setView((location.hash||'').slice(1)));
 fetch('data/fx.json',{cache:'no-store'}).then((r)=>r.ok?r.json():Promise.reject(r.status)).then((d)=>{D=d;render();window.__FX=d;window.dispatchEvent(new CustomEvent('fx:data',{detail:d}))})
   .catch(()=>{$('#asof').textContent='';document.querySelector('.wrap').insertAdjacentHTML('afterbegin','<div class="err">환율 데이터를 아직 만들지 못했습니다. 첫 자동 갱신 뒤에 다시 열어 주세요.</div>')});
 })();

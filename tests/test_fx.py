@@ -87,3 +87,14 @@ def test_build_includes_forecast_and_survives_bad_extra():
     r = fake_rates()
     data = fx.build(r, None, {}, None, datetime(2026, 8, 24, tzinfo=timezone.utc), {"usd": [("x", 1.0)], "rates": None})
     assert set(data["forecast"]["horizons"]) == {"short", "mid", "long"}
+
+
+def test_forecast_hist_and_decomp():
+    r = fake_rates()
+    d1 = fx.build(r, None, {}, None, datetime(2026, 8, 24, tzinfo=timezone.utc), {})
+    f = d1["forecast"]
+    assert len(f["hist"]) == 1 and set(f["hist"][0]["h"]) == {"short", "mid", "long"}
+    dc = f["decomp"]["1개월"]
+    assert abs((1 + dc["nzdusd"] / 100) * (1 + dc["usdkrw"] / 100) - (1 + dc["nzdkrw"] / 100)) < 0.002
+    d2 = fx.build(r, d1, {}, None, datetime(2026, 8, 25, tzinfo=timezone.utc), {})
+    assert len(d2["forecast"]["hist"]) == 1  # 같은 기준일은 한 줄만

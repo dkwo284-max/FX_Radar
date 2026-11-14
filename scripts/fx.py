@@ -203,7 +203,14 @@ def _forecast(rates: dict, extra: dict | None, prev: dict | None) -> dict | None
         k = [(d, r["KRW"]) for d, r in rates.items() if "KRW" in r]
         if len(k) < 300:
             return (prev or {}).get("forecast")
-        out = fc.build(k, extra or {}, ((prev or {}).get("forecast") or {}).get("log"))
+        pf = (prev or {}).get("forecast") or {}
+        out = fc.build(k, extra or {}, pf.get("log"), pf.get("hist"))
+        # NZD/KRW 변화 = NZD/USD 변화(뉴질랜드달러 쪽) + USD/KRW 변화(원화 쪽)
+        u = [(d, r["USD"]) for d, r in rates.items() if "USD" in r and "KRW" in r]
+        uk = [(d, r["KRW"] / r["USD"]) for d, r in rates.items() if "USD" in r and "KRW" in r]
+        out["decomp"] = {name: {"nzdkrw": round(fc.pct_change(k, n) or 0, 2), "nzdusd": round(fc.pct_change(u, n) or 0, 2), "usdkrw": round(fc.pct_change(uk, n) or 0, 2)}
+                         for name, n in (("1주", 5), ("1개월", 21), ("3개월", 63), ("1년", 250)) if len(u) > n}
+        out["usdkrw"] = round(uk[-1][1], 1)
         ex = extra or {}
         out["inputs"] = {n: (ex[n][-1][0] if ex.get(n) else None) for n in ("usd", "spx", "kospi", "milk")}
         out["inputs"]["rates"] = ex["rates"]["NZ"][-1][0] if ex.get("rates") else None
