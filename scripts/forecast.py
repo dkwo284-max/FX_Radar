@@ -104,7 +104,7 @@ def f_rates(rates: dict | None) -> dict | None:
     now, ago = diff[-1][1], diff[-7][1]
     s = (1 if now > 0.5 else -1 if now < -0.5 else 0) + (1 if now - ago > 0.25 else -1 if now - ago < -0.25 else 0)
     return {"score": s, "value": round(now, 2), "asof": diff[-1][0],
-            "why": f"3개월 금리 뉴질랜드 {nz[-1][1]:.2f}% − 한국 {km[diff[-1][0]]:.2f}% = {now:+.2f}%p, 6개월 전보다 {now - ago:+.2f}%p"
+            "why": f"3개월 금리({diff[-1][0]} 기준) 뉴질랜드 {nz[-1][1]:.2f}% − 한국 {km[diff[-1][0]]:.2f}% = {now:+.2f}%p, 6개월 전보다 {now - ago:+.2f}%p"
                    + (" → 뉴질랜드달러에 유리" if s > 0 else " → 원화에 유리" if s < 0 else " → 차이 작음")}
 
 
@@ -118,8 +118,8 @@ def f_linked(k: Series, other: Series | None, name: str, days: int, scale: float
         return None
     if abs(c) < 0.15:
         return {"score": 0, "value": round(mv, 2), "corr": round(c, 2), "why": f"{name} {days}거래일 {mv:+.1f}% · 최근 1년 NZD/KRW 와의 관계가 약함(상관 {c:+.2f}) → 중립"}
-    s = clamp(mv / scale) * (1 if c > 0 else -1)
-    rel = "같은 방향" if c > 0 else "반대 방향"
+    s = clamp(mv / scale) * (1 if c > 0 else -1) * min(1.0, abs(c) / 0.5)  # 관계가 약할수록 점수도 작게
+    rel = ("같은 방향" if c > 0 else "반대 방향") + ("으로 약하게 움직임" if abs(c) < 0.3 else "으로 움직임")
     return {"score": round(s, 2), "value": round(mv, 2), "corr": round(c, 2),
             "why": f"{name} {days}거래일 {mv:+.1f}% · 최근 1년 NZD/KRW 와 {rel}(상관 {c:+.2f})"}
 
