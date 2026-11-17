@@ -1,21 +1,21 @@
 {
- "asOf": "2026-11-13",
- "fetchedAt": "2026-11-15T23:54:51+00:00",
+ "asOf": "2026-11-17",
+ "fetchedAt": "2026-11-17T00:24:40+00:00",
  "prices": {
-  "glovis": 204500,
-  "steel": 28900,
-  "innocean": 17420
+  "glovis": 205500,
+  "steel": 28300,
+  "innocean": 17430
  },
  "dates": {
-  "glovis": "2026-11-13",
-  "steel": "2026-11-13",
-  "innocean": "2026-11-13"
+  "glovis": "2026-11-17",
+  "steel": "2026-11-17",
+  "innocean": "2026-11-17"
  },
  "src": {
   "glovis": "yahoo",
   "steel": "yahoo",
   "innocean": "yahoo"
  },
- "fx": 739.71,
- "fxDate": "2026-11-13"
+ "fx": 736.18,
+ "fxDate": "2026-11-16"
 }
