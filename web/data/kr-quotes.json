@@ -1,15 +1,15 @@
 {
- "asOf": "2026-11-18",
- "fetchedAt": "2026-11-18T23:02:08+00:00",
+ "asOf": "2026-11-19",
+ "fetchedAt": "2026-11-19T01:50:22+00:00",
  "prices": {
-  "glovis": 204000,
-  "steel": 29000,
-  "innocean": 17140
+  "glovis": 201500,
+  "steel": 28700,
+  "innocean": 17090
  },
  "dates": {
-  "glovis": "2026-11-18",
-  "steel": "2026-11-18",
-  "innocean": "2026-11-18"
+  "glovis": "2026-11-19",
+  "steel": "2026-11-19",
+  "innocean": "2026-11-19"
  },
  "src": {
   "glovis": "yahoo",
