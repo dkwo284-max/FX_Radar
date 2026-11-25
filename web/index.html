@@ -173,7 +173,7 @@ a{color:var(--accent)}
       <label for="c-fee">고정 수수료 (보내는 통화)<input id="c-fee" type="text" value="0" inputmode="decimal" autocomplete="off" data-num></label>
       <label for="c-mar">환율 마진 % (은행·업체 스프레드)<input id="c-mar" type="number" min="0" max="10" step="0.1" value="0" inputmode="decimal"></label>
     </div>
-    <div><span class="hint">받는 금액 (추정)</span><div class="out" id="c-out">—</div><p class="hint" id="c-note"></p></div>
+    <div><span class="hint">받는 금액 (추정)</span><div class="out" id="c-out">—</div><p class="hint" id="c-note"></p><div id="c-prov" class="hint"></div></div>
     <p class="hint">기준환율에 내가 쓰는 업체의 수수료와 마진을 넣어 계산합니다. 업체별 실제 견적은 아래 표를 보세요.</p>
   </section>
 
@@ -203,7 +203,13 @@ a{color:var(--accent)}
     <h2>다른 통화와 알림 기록</h2>
     <div class="tbl" id="others"></div>
     <div id="alerts"></div>
-    <p class="hint">목표 환율은 저장소의 config.json 에서 바꿉니다. 목표에 닿거나 1년 중 상위·하위 10% 구간에 처음 들어가면 기록되고 My Hub 경고에 표시됩니다.</p>
+    <h2 style="margin-top:14px">내 목표 환율</h2>
+    <div class="calc">
+      <label for="t-up">NZD→KRW 보낼 때: 이 값 이상이면 알림 (원)<input id="t-up" type="number" min="100" max="3000" step="0.5" inputmode="decimal" placeholder="예: 780"></label>
+      <label for="t-dn">KRW→NZD 보낼 때: 이 값 이하이면 알림 (원)<input id="t-dn" type="number" min="100" max="3000" step="0.5" inputmode="decimal" placeholder="예: 720"></label>
+    </div>
+    <p class="hint" id="t-st"></p>
+    <p class="hint">여기서 정한 목표는 이 기기에 저장되고, 같은 기기에서 연 My Hub 의 '오늘 볼 것'과 경고에도 떠요. 모든 기기에 공통으로 쓰려면 저장소의 config.json 에 넣으면 됩니다. 1년 중 상위·하위 10% 구간에 처음 들어가는 날도 기록돼요.</p>
   </section>
 
   <footer class="hint" id="foot">ECB 기준환율은 유럽 시간 오후에 하루 한 번 고시되며 주말·휴일에는 바뀌지 않습니다. 실제 송금 환율과 다르므로 참고용으로 보세요.</footer>
@@ -363,7 +369,25 @@ function calc(){
   $('#c-amt-ko').textContent=dir==='kr2nz'?NumFmt.ko(amt):'';
   if(dir==='nz2kr'){const v=base*r*(1-mar);$('#c-out').textContent=`${Math.round(v).toLocaleString('ko-KR')}원`;$('#c-note').textContent=`적용 환율 ${f2(r*(1-mar))}원 (기준 ${f2(r)}원)`}
   else{const v=base/(r*(1+mar));$('#c-out').textContent=`NZ$${v.toLocaleString('en-NZ',{maximumFractionDigits:2})}`;$('#c-note').textContent=`적용 환율 ${f2(r*(1+mar))}원/NZ$ (기준 ${f2(r)}원)`}
+  // 업체 견적(NZ$ 기준 금액으로 수집)을 이 금액에 맞춰 환산: 받는 금액 ≈ (금액 − 업체 고정 수수료) × 업체 적용 환율
+  const q=D.quotes, pv=$('#c-prov');
+  if(dir==='nz2kr'&&q&&q.providers&&q.providers.length&&amt>0){
+    const rows=q.providers.filter((p)=>p.rate).map((p)=>({n:p.name,v:Math.max(0,amt-(p.fee||0))*p.rate})).sort((a,b)=>b.v-a.v);
+    pv.innerHTML=`이 금액을 업체로 보내면 (수집한 견적 비율로 환산): ${rows.map((x,i)=>`${i?'':'<b>'}${esc(x.n)} ${Math.round(x.v).toLocaleString('ko-KR')}원${i?'':'</b>'}`).join(' · ')}${rows.length>1?` · 차이 ${Math.round(rows[0].v-rows[rows.length-1].v).toLocaleString('ko-KR')}원`:''}`;
+  } else pv.textContent='';
 }
+// 내 목표 환율(이 기기): { up: 원, dn: 원 } — My Hub(같은 주소)도 읽는다
+function loadT(){try{return JSON.parse(localStorage.getItem('fx.targets')||'{}')||{}}catch(e){return {}}}
+function targets(){
+  if(!D)return;
+  const t=loadT(), r=D.pairs.KRW.last, up=$('#t-up'), dn=$('#t-dn');
+  if(document.activeElement!==up)up.value=t.up||''; if(document.activeElement!==dn)dn.value=t.dn||'';
+  const parts=[];
+  if(t.up)parts.push(r>=t.up?`🔔 지금 ${f2(r)}원 — NZD→KRW 목표 ${f2(t.up)}원에 닿았어요`:`NZD→KRW 목표 ${f2(t.up)}원까지 ${f2(t.up-r)}원 (${((t.up/r-1)*100).toFixed(1)}%)`);
+  if(t.dn)parts.push(r<=t.dn?`🔔 지금 ${f2(r)}원 — KRW→NZD 목표 ${f2(t.dn)}원 아래예요`:`KRW→NZD 목표 ${f2(t.dn)}원까지 ${f2(r-t.dn)}원 (${((1-t.dn/r)*100).toFixed(1)}%)`);
+  $('#t-st').textContent=parts.join(' · ')||'목표를 넣으면 지금 환율과의 거리를 보여 드려요.';
+}
+['#t-up','#t-dn'].forEach((sel)=>document.addEventListener('change',(e)=>{if(e.target.matches&&e.target.matches(sel)){const t=loadT(),v=parseFloat(e.target.value);t[sel==='#t-up'?'up':'dn']=isFinite(v)&&v>0?v:null;try{localStorage.setItem('fx.targets',JSON.stringify(t))}catch(err){};targets()}}));
 function render(){
   const k=D.pairs.KRW, sg=D.signal;
   $('#asof').textContent=`기준일 ${k.date} · 갱신 ${new Date(D.generated_at).toLocaleString('ko-KR',{timeZone:'Pacific/Auckland',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})} (오클랜드)`;
@@ -375,7 +399,7 @@ function render(){
   [['#s-kr',sg.to_kr],['#s-nz',sg.to_nz]].forEach(([id,t])=>{const e=$(id);e.className='sig '+cls(t);e.querySelector('b').textContent=t;e.querySelectorAll('.hint')[1].textContent=sg.trend});
   $('#sigtext').textContent=`지금 NZD/KRW 는 ${sg.text}. 이 줄은 과거 위치예요.`;
   $('#range').innerHTML=RANGES.map(([d,l])=>`<button type="button" data-r="${d}" aria-pressed="${d===range}">${l}</button>`).join('');
-  forecast(); today(); decomp(); split(); siglog(); chart(); calc();
+  forecast(); today(); decomp(); split(); siglog(); chart(); calc(); targets();
   const q=D.quotes;
   if(q&&q.providers&&q.providers.length){
     $('#q-sub').textContent=`NZ$${q.amount} 보낼 때 · ${new Date(q.fetched).toLocaleDateString('ko-KR')} 수집`;
