@@ -71,6 +71,21 @@ body{padding-bottom:72px}
 @media (max-width:480px){.fcr{grid-template-columns:minmax(0,1fr) 84px}}
 .sig.g{background:var(--good-bg)} .sig.g b{color:var(--good)}
 .sig.r{background:var(--bad-bg)} .sig.r b{color:var(--bad)}
+/* 내가 주로 보내는 방향만 크게, 반대쪽은 한 줄로 */
+.dirpick{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted)}
+.dirpick button{font:inherit;font-size:12.5px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.dirpick button[aria-pressed="true"]{border-color:var(--ink);font-weight:700}
+.sigs.has-main{grid-template-columns:1fr}
+.sig.main b{font-size:26px} .sig.main{padding:16px}
+.sig.mini{flex-direction:row;align-items:center;gap:8px;padding:8px 12px;opacity:.85}
+.sig.mini b{font-size:14px;white-space:nowrap} .sig.mini .hint:last-child{display:none}
+/* 큰 환율 옆 30일 미니 그래프 */
+.spark30{min-width:110px;width:42vw;max-width:220px;align-self:center}
+.hero .chg{grid-column:1/-1}
+.spark30 svg{width:100%;height:46px;display:block}
+.spark30 small{display:block;font-size:11px;color:var(--muted);text-align:right}
+/* 아래 탭: 같은 선 아이콘 */
+.tabs button svg{width:22px;height:22px;display:block;margin:0 auto 2px}
 .gauge{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--bad-bg),var(--mid-bg) 30% 70%,var(--good-bg))}
 .gauge i{position:absolute;top:-4px;width:4px;height:18px;margin-left:-2px;border-radius:2px;background:var(--ink)}
 .gl{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
@@ -116,12 +131,14 @@ a{color:var(--accent)}
   <section class="panel" data-tab="today" aria-label="지금 환율">
     <div class="hero">
       <div><p class="hint">NZD 1 = 원 (ECB 기준환율)</p><div class="rate" id="rate">—</div></div>
+      <div class="spark30" id="spark30" aria-hidden="true"></div>
       <div class="chg" id="chg"></div>
     </div>
     <div>
       <div class="gauge" aria-hidden="true"><i id="gi" style="left:50%"></i></div>
       <div class="gl"><span id="lo52">1년 최저</span><span>1년 중 위치</span><span id="hi52">1년 최고</span></div>
     </div>
+    <div class="dirpick" id="dirpick" role="group" aria-label="내가 주로 보내는 방향"></div>
     <div class="sigs">
       <div class="sig" id="s-kr"><span class="hint">🇳🇿→🇰🇷 한국으로 보낼 때 (NZD를 원화로)</span><b>—</b><span class="hint"></span></div>
       <div class="sig" id="s-nz"><span class="hint">🇰🇷→🇳🇿 뉴질랜드로 보낼 때 (원화를 NZD로)</span><b>—</b><span class="hint"></span></div>
@@ -235,7 +252,9 @@ const esc=(s)=>String(s??'').replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>'
 const f2=(v)=>v==null?'—':v.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const pc=(v)=>v==null?'—':`<span class="${v>=0?'up':'down'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
 let D=null, range=365, fhz='mid', FN=null, view='today', spn=4, fcAll=false;
-const VIEWS=[['today','오늘','🧭'],['outlook','전망','📈'],['send','송금','💸'],['log','기록','🗂️']];
+const ICON=(d)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const VIEWS=[['today','오늘',ICON('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8z"/>')],['outlook','전망',ICON('<path d="M4 19h16M5 15l4-4 3 3 6-7"/><path d="M15 7h3v3"/>')],
+  ['send','송금',ICON('<path d="M4 12h13M13 7l5 5-5 5"/><path d="M4 6v12"/>')],['log','기록',ICON('<path d="M7 4h10a2 2 0 0 1 2 2v14l-4-2-3 2-3-2-4 2V6a2 2 0 0 1 2-2z"/><path d="M9 9h6M9 13h4"/>')]];
 try{fhz=localStorage.getItem('fx.fhz')||'mid'}catch(e){}
 try{range=+localStorage.getItem('fx.range')||365}catch(e){}
 const RANGES=[[91,'3개월'],[182,'6개월'],[365,'1년'],[730,'2년']];
@@ -396,7 +415,16 @@ function render(){
   $('#gi').style.left=`${Math.max(0,Math.min(100,k.pct1y))}%`;
   $('#lo52').textContent=`1년 최저 ${f2(k.lo52)}`; $('#hi52').textContent=`1년 최고 ${f2(k.hi52)}`;
   const cls=(t)=>t.includes('유리')?'g':t.includes('불리')?'r':'';
-  [['#s-kr',sg.to_kr],['#s-nz',sg.to_nz]].forEach(([id,t])=>{const e=$(id);e.className='sig '+cls(t);e.querySelector('b').textContent=t;e.querySelectorAll('.hint')[1].textContent=sg.trend});
+  let dir=''; try{dir=localStorage.getItem('fx.dir')||''}catch(e){}
+  [['#s-kr',sg.to_kr,'kr'],['#s-nz',sg.to_nz,'nz']].forEach(([id,t,k])=>{const e=$(id);e.className='sig '+cls(t)+(dir?(dir===k?' main':' mini'):'');e.querySelector('b').textContent=t;e.querySelectorAll('.hint')[1].textContent=sg.trend});
+  if(dir==='nz')$('#s-nz').after($('#s-kr')); else $('#s-kr').after($('#s-nz'));
+  document.querySelector('.sigs').classList.toggle('has-main',!!dir);
+  $('#dirpick').innerHTML=`<span>주로 보내는 방향</span>${[['kr','🇳🇿→🇰🇷 한국으로'],['nz','🇰🇷→🇳🇿 뉴질랜드로'],['','둘 다']].map(([k,l])=>`<button type="button" data-dir="${k}" aria-pressed="${dir===k}">${l}</button>`).join('')}`;
+  // 30일 미니 그래프
+  { const sv=D.series&&D.series.KRW?D.series.KRW.slice(-30).filter((x)=>x!=null):[];
+    if(sv.length>2){const mn=Math.min(...sv),mx=Math.max(...sv),W=200,H=46,pts=sv.map((v,i)=>`${(i/(sv.length-1)*W).toFixed(1)},${(H-4-(v-mn)/((mx-mn)||1)*(H-8)).toFixed(1)}`).join(' ');
+      const up=sv[sv.length-1]>=sv[0];
+      $('#spark30').innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="var(${up?'--good':'--bad'})" stroke-width="2" vector-effect="non-scaling-stroke"/><circle cx="${W}" cy="${pts.split(' ').pop().split(',')[1]}" r="3" fill="var(${up?'--good':'--bad'})"/></svg><small>최근 30일 ${up?'▲':'▼'} ${f2(Math.abs(sv[sv.length-1]-sv[0]))}원</small>`;} }
   $('#sigtext').textContent=`지금 NZD/KRW 는 ${sg.text}. 이 줄은 과거 위치예요.`;
   $('#range').innerHTML=RANGES.map(([d,l])=>`<button type="button" data-r="${d}" aria-pressed="${d===range}">${l}</button>`).join('');
   forecast(); today(); decomp(); split(); siglog(); chart(); calc(); targets();
@@ -409,7 +437,8 @@ function render(){
   const al=(D.alerts||[]).slice().reverse();
   $('#alerts').innerHTML=al.length?`<ul>${al.map((a)=>`<li><span class="num">${esc(a.date)}</span> ${esc(a.text)}</li>`).join('')}</ul>`:'<p class="hint">최근 60일 알림 없음</p>';
 }
-document.addEventListener('click',(e)=>{const tv=e.target.closest('[data-view]');if(tv){setView(tv.dataset.view,true);return}
+document.addEventListener('click',(e)=>{const tv=e.target.closest('button[data-view]');if(tv){setView(tv.dataset.view,true);return}
+  const dp=e.target.closest('[data-dir]');if(dp&&D){try{dp.dataset.dir?localStorage.setItem('fx.dir',dp.dataset.dir):localStorage.removeItem('fx.dir')}catch(err){};render();return}
   const go=e.target.closest('[data-go]');if(go&&D){fhz=go.dataset.go;forecast();split();setView('outlook',true);return}
   if(e.target.closest('[data-fcall]')&&D){fcAll=!fcAll;forecast();return}
   const sn=e.target.closest('[data-spn]');if(sn&&D){spn=+sn.dataset.spn;split();return}
