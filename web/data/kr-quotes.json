@@ -1,10 +1,10 @@
 {
  "asOf": "2026-11-25",
- "fetchedAt": "2026-11-25T03:29:56+00:00",
+ "fetchedAt": "2026-11-25T06:33:28+00:00",
  "prices": {
-  "glovis": 201500,
-  "steel": 26800,
-  "innocean": 16770
+  "glovis": 204500,
+  "steel": 27150,
+  "innocean": 16760
  },
  "dates": {
   "glovis": "2026-11-25",
